@@ -354,13 +354,19 @@ public class MainActivity extends Activity
             String user = "me"; // This is a special value that is synonymous with the authenticated user
             List<String> messages = new ArrayList<String>();
             ListMessagesResponse listResponse = mService.users().messages().list(user).execute();
+
+
+            List<String> headerList = new ArrayList<String>();
+            headerList.add("Subject");
+
             for (Message message : listResponse.getMessages()) {
 
                 //String messageId = message.getId();
                 //Message response = mService.users().messages().get("me", messageId).execute();
                 //System.out.println(response.getSnippet());
-                Message indivMessage = mService.users().messages().get("me", message.getId()).execute();
-                messages.add(indivMessage.getSnippet());
+
+                Message indivMessage = mService.users().messages().get("me", message.getId()).setFormat("metadata").setMetadataHeaders(headerList).execute();
+                messages.add(indivMessage.getPayload().getHeaders().get(0).getValue());
             }
             return messages;
         }
