@@ -27,6 +27,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.text.method.ScrollingMovementMethod;
@@ -40,6 +41,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
@@ -48,7 +50,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
 
     // Instantiate some display elements
     GoogleAccountCredential mCredential;
-    private TextView mOutputText;
+    private static TextView mOutputText;
     private Button mCallApiButton;
     ProgressDialog mProgress;
 
@@ -59,13 +61,17 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
 
     private static final String PREF_ACCOUNT_NAME = "accountName";
 
+    // Variable for storing emails and iterating through them
+    public static List<Email> emails = new ArrayList<Email>();
+    public static int emailCounter = 0;
+
     // Declare Gmail API scope
     private static final String[] SCOPES = { GmailScopes.MAIL_GOOGLE_COM };
 
-    /**
-     * Create the main activity.
-     * @param savedInstanceState previously saved instance data.
-     */
+
+    // Create TTS instance
+    private static TextToSpeech tts;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -111,6 +117,14 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
         mCredential = GoogleAccountCredential.usingOAuth2(
                 getApplicationContext(), Arrays.asList(SCOPES))
                 .setBackOff(new ExponentialBackOff());
+
+        // Instantiate TTS Object
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int i) {
+                tts.setLanguage(Locale.US);
+            }
+        });
     }
 
     /**
@@ -130,6 +144,20 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
         } else {
             new MakeRequestTask(mCredential).execute();
         }
+    }
+
+    public static void readEmail() {
+        Email curEmail = emails.get(MainActivity.emailCounter);
+        String response = "New email from " + curEmail.getSenderName() + " and email " + curEmail.getSenderEmail() + " with the subject " + curEmail.getSubject();
+        String question = "Would you like to reply, delete, skip or repeat?";
+        mOutputText.setText(response);
+        MainActivity.emailCounter++; // Increment counter
+        textToSpeech(response);
+        textToSpeech(question);
+    }
+
+    public static void textToSpeech(String input) {
+        tts.speak(input, TextToSpeech.QUEUE_ADD, null);
     }
 
     /**
@@ -353,18 +381,20 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
 
                 String id = message.getId();
 
-                Message messageSubject = mService.users().messages().get("me", id).setFormat("metadata").setMetadataHeaders(subjectList).execute();
+                Message messageSubject = mService.users().messages().get("me", id).setFormat("metadata").setMetadataHeaders((subjectList)).execute();
                 Message messageSender = mService.users().messages().get("me", id).setFormat("metadata").setMetadataHeaders(senderList).execute();
 
-                String subject = (messageSubject.getPayload().getHeaders().get(0).getValue());
-                String senderName = ""; //TODO parse what's needed from messageSender
-                String senderEmail = ""; //TODO parse what's needed from messageSender
+                String subject = messageSubject.getPayload().getHeaders().get(0).getValue();
+                String senderFull = messageSender.getPayload().getHeaders().get(0).getValue();
+                String senderName =  senderFull.substring(0, senderFull.indexOf("<")-1);
+                String senderEmail = senderFull.substring(senderFull.indexOf("<")+1, senderFull.length()-1);
                 String messageBody = ""; //TODO
 
                 // Create email object
                 Email email = new Email(message.getId(), subject, senderName, senderEmail, messageBody);
                 emails.add(email);
             }
+            MainActivity.emails = emails;
             return emails;
         }
 
@@ -378,7 +408,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
         @Override
         protected void onPostExecute(List<Email> output) {
             mProgress.hide();
-            if (output == null || output.size() == 0) {
+            /**if (output == null || output.size() == 0) {
                 mOutputText.setText("No results returned.");
             } else {
                 List<String> subjects = new ArrayList<String>();
@@ -386,7 +416,8 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                     subjects.add(email.getSubject());
                 }
                 mOutputText.setText(TextUtils.join("\n", subjects));
-            }
+            }**/
+            MainActivity.readEmail();
         }
 
         @Override
