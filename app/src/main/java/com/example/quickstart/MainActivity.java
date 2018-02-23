@@ -44,8 +44,9 @@ import java.util.List;
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 
-public class MainActivity extends Activity
-    implements EasyPermissions.PermissionCallbacks {
+public class MainActivity extends Activity implements EasyPermissions.PermissionCallbacks {
+
+    // Instantiate some display elements
     GoogleAccountCredential mCredential;
     private TextView mOutputText;
     private Button mCallApiButton;
@@ -56,8 +57,9 @@ public class MainActivity extends Activity
     static final int REQUEST_GOOGLE_PLAY_SERVICES = 1002;
     static final int REQUEST_PERMISSION_GET_ACCOUNTS = 1003;
 
-    private static final String BUTTON_TEXT = "Call Gmail API";
     private static final String PREF_ACCOUNT_NAME = "accountName";
+
+    // Declare Gmail API scope
     private static final String[] SCOPES = { GmailScopes.MAIL_GOOGLE_COM };
 
     /**
@@ -67,20 +69,18 @@ public class MainActivity extends Activity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Create a layout
         LinearLayout activityLayout = new LinearLayout(this);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.MATCH_PARENT);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT);
         activityLayout.setLayoutParams(lp);
         activityLayout.setOrientation(LinearLayout.VERTICAL);
         activityLayout.setPadding(16, 16, 16, 16);
+        ViewGroup.LayoutParams tlp = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
-        ViewGroup.LayoutParams tlp = new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-
+        // Create button to call api
         mCallApiButton = new Button(this);
-        mCallApiButton.setText(BUTTON_TEXT);
+        mCallApiButton.setText("Test App");
         mCallApiButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -92,17 +92,18 @@ public class MainActivity extends Activity
         });
         activityLayout.addView(mCallApiButton);
 
+        // Make box for output text
         mOutputText = new TextView(this);
         mOutputText.setLayoutParams(tlp);
         mOutputText.setPadding(16, 16, 16, 16);
         mOutputText.setVerticalScrollBarEnabled(true);
         mOutputText.setMovementMethod(new ScrollingMovementMethod());
         mOutputText.setText(
-                "Click the \'" + BUTTON_TEXT +"\' button to test the API.");
+                "Click the 'Test App' button to test the API.");
         activityLayout.addView(mOutputText);
 
         mProgress = new ProgressDialog(this);
-        mProgress.setMessage("Calling Gmail API ...");
+        mProgress.setMessage("Fetching New Emails ...");
 
         setContentView(activityLayout);
 
@@ -350,25 +351,35 @@ public class MainActivity extends Activity
          * @throws IOException
          */
         private List<String> getDataFromApi() throws IOException {
-            // Get the message headers
-            String user = "me"; // This is a special value that is synonymous with the authenticated user
-            List<String> messages = new ArrayList<String>();
-            ListMessagesResponse listResponse = mService.users().messages().list(user).execute();
+            // Create list to store email objects...
+            List<Email> emails = new ArrayList<Email>();
 
+            // Specify which headers should be fetched TODO make it so that it only needs 1 list, so 1 API call...
+            List<String> subjectList = new ArrayList<String>();
+            subjectList.add("Subject");
+            List<String> senderList = new ArrayList<String>();
+            senderList.add("From");
 
-            List<String> headerList = new ArrayList<String>();
-            headerList.add("Subject");
+            ListMessagesResponse listResponse = mService.users().messages().list("me").execute();
 
+            // Loop through the messages to get necessary info
             for (Message message : listResponse.getMessages()) {
 
-                //String messageId = message.getId();
-                //Message response = mService.users().messages().get("me", messageId).execute();
-                //System.out.println(response.getSnippet());
+                String id = message.getId();
 
-                Message indivMessage = mService.users().messages().get("me", message.getId()).setFormat("metadata").setMetadataHeaders(headerList).execute();
-                messages.add(indivMessage.getPayload().getHeaders().get(0).getValue());
+                Message messageSubject = mService.users().messages().get("me", id).setFormat("metadata").setMetadataHeaders(subjectList).execute();
+                Message messageSender = mService.users().messages().get("me", id).setFormat("metadata").setMetadataHeaders(senderList).execute();
+
+                String subject = (messageSubject.getPayload().getHeaders().get(0).getValue());
+                String senderName = ""; //TODO parse what's needed from messageSender
+                String senderEmail = ""; //TODO parse what's needed from messageSender
+                String messageBody = ""; //TODO
+
+                // Create email object
+                Email email = new Email(message.getId(), subject, senderName, senderEmail, messageBody);
+                emails.add(email);
             }
-            return messages;
+            return subjectList; // TODO remove, make this function void
         }
 
 
