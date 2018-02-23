@@ -86,7 +86,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
             public void onClick(View v) {
                 mCallApiButton.setEnabled(false);
                 mOutputText.setText("");
-                getResultsFromApi();
+                getNewEmails();
                 mCallApiButton.setEnabled(true);
             }
         });
@@ -113,8 +113,6 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                 .setBackOff(new ExponentialBackOff());
     }
 
-
-
     /**
      * Attempt to call the API, after verifying that all the preconditions are
      * satisfied. The preconditions are: Google Play Services installed, an
@@ -122,7 +120,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
      * of the preconditions are not satisfied, the app will prompt the user as
      * appropriate.
      */
-    private void getResultsFromApi() {
+    private void getNewEmails() {
         if (! isGooglePlayServicesAvailable()) {
             acquireGooglePlayServices();
         } else if (mCredential.getSelectedAccountName() == null) {
@@ -152,7 +150,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                     .getString(PREF_ACCOUNT_NAME, null);
             if (accountName != null) {
                 mCredential.setSelectedAccountName(accountName);
-                getResultsFromApi();
+                getNewEmails();
             } else {
                 // Start a dialog from which the user can choose an account
                 startActivityForResult(
@@ -190,7 +188,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                             "This app requires Google Play Services. Please install " +
                                     "Google Play Services on your device and relaunch this app.");
                 } else {
-                    getResultsFromApi();
+                    getNewEmails();
                 }
                 break;
             case REQUEST_ACCOUNT_PICKER:
@@ -205,13 +203,13 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                         editor.putString(PREF_ACCOUNT_NAME, accountName);
                         editor.apply();
                         mCredential.setSelectedAccountName(accountName);
-                        getResultsFromApi();
+                        getNewEmails();
                     }
                 }
                 break;
             case REQUEST_AUTHORIZATION:
                 if (resultCode == RESULT_OK) {
-                    getResultsFromApi();
+                    getNewEmails();
                 }
                 break;
         }
@@ -313,11 +311,8 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
         dialog.show();
     }
 
-    /**
-     * An asynchronous task that handles the Gmail API call.
-     * Placing the API calls in their own task ensures the UI stays responsive.
-     */
-    private class MakeRequestTask extends AsyncTask<Void, Void, List<String>> {
+    // Class for making tasks --- API calls should be used with tasks to keep UI responsive
+    private class MakeRequestTask extends AsyncTask<Void, Void, List<Email>> {
         private com.google.api.services.gmail.Gmail mService = null;
         private Exception mLastError = null;
 
@@ -330,14 +325,10 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                     .build();
         }
 
-        /**
-         * Background task to call Gmail API.
-         * @param params no parameters needed for this task.
-         */
         @Override
-        protected List<String> doInBackground(Void... params) {
+        protected List<Email> doInBackground(Void... params) {
             try {
-                return getDataFromApi();
+                return getEmails();
             } catch (Exception e) {
                 mLastError = e;
                 cancel(true);
@@ -345,12 +336,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
             }
         }
 
-        /**
-         * Fetch a list of Gmail labels attached to the specified account.
-         * @return List of Strings labels.
-         * @throws IOException
-         */
-        private List<String> getDataFromApi() throws IOException {
+        private List<Email> getEmails() throws IOException {
             // Create list to store email objects...
             List<Email> emails = new ArrayList<Email>();
 
@@ -379,10 +365,10 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                 Email email = new Email(message.getId(), subject, senderName, senderEmail, messageBody);
                 emails.add(email);
             }
-            return subjectList; // TODO remove, make this function void
+            return emails;
         }
 
-
+        // All of these methods are steps for AsyncTask
         @Override
         protected void onPreExecute() {
             mOutputText.setText("");
@@ -390,35 +376,22 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
         }
 
         @Override
-        protected void onPostExecute(List<String> output) {
+        protected void onPostExecute(List<Email> output) {
             mProgress.hide();
             if (output == null || output.size() == 0) {
                 mOutputText.setText("No results returned.");
             } else {
-                output.add(0, "Data retrieved using the Gmail API:");
-                mOutputText.setText(TextUtils.join("\n", output));
+                List<String> subjects = new ArrayList<String>();
+                for (Email email: output) {
+                    subjects.add(email.getSubject());
+                }
+                mOutputText.setText(TextUtils.join("\n", subjects));
             }
         }
 
         @Override
         protected void onCancelled() {
             mProgress.hide();
-            if (mLastError != null) {
-                if (mLastError instanceof GooglePlayServicesAvailabilityIOException) {
-                    showGooglePlayServicesAvailabilityErrorDialog(
-                            ((GooglePlayServicesAvailabilityIOException) mLastError)
-                                    .getConnectionStatusCode());
-                } else if (mLastError instanceof UserRecoverableAuthIOException) {
-                    startActivityForResult(
-                            ((UserRecoverableAuthIOException) mLastError).getIntent(),
-                            MainActivity.REQUEST_AUTHORIZATION);
-                } else {
-                    mOutputText.setText("The following error occurred:\n"
-                            + mLastError.getMessage());
-                }
-            } else {
-                mOutputText.setText("Request cancelled.");
-            }
         }
     }
 }
