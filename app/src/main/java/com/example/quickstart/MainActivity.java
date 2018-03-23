@@ -148,7 +148,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
 
     public static void readEmail() {
         Email curEmail = emails.get(MainActivity.emailCounter);
-        String response = "New email from " + curEmail.getSenderName() + " and email " + curEmail.getSenderEmail() + " with the subject " + curEmail.getSubject();
+        String response = "New email from " + curEmail.getSenderName() + " with the subject " + curEmail.getSubject();
         String question = "Would you like to reply, delete, skip or repeat?";
         mOutputText.setText(response);
         MainActivity.emailCounter++; // Increment counter
@@ -386,8 +386,8 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
 
                 String subject = messageSubject.getPayload().getHeaders().get(0).getValue();
                 String senderFull = messageSender.getPayload().getHeaders().get(0).getValue();
-                String senderName =  senderFull.substring(0, senderFull.indexOf("<")-1);
-                String senderEmail = senderFull.substring(senderFull.indexOf("<")+1, senderFull.length()-1);
+                String senderName =  senderFull;//.substring(0, senderFull.indexOf("<")-1);
+                String senderEmail = senderFull;//.substring(senderFull.indexOf("<")+1, senderFull.length()-1);
                 String messageBody = ""; //TODO
 
                 // Create email object
@@ -408,7 +408,7 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
         @Override
         protected void onPostExecute(List<Email> output) {
             mProgress.hide();
-            /**if (output == null || output.size() == 0) {
+            if (output == null || output.size() == 0) {
                 mOutputText.setText("No results returned.");
             } else {
                 List<String> subjects = new ArrayList<String>();
@@ -416,13 +416,29 @@ public class MainActivity extends Activity implements EasyPermissions.Permission
                     subjects.add(email.getSubject());
                 }
                 mOutputText.setText(TextUtils.join("\n", subjects));
-            }**/
+            }
             MainActivity.readEmail();
         }
 
         @Override
         protected void onCancelled() {
             mProgress.hide();
+            if (mLastError != null) {
+                if (mLastError instanceof GooglePlayServicesAvailabilityIOException) {
+                    showGooglePlayServicesAvailabilityErrorDialog(
+                            ((GooglePlayServicesAvailabilityIOException) mLastError)
+                                    .getConnectionStatusCode());
+                } else if (mLastError instanceof UserRecoverableAuthIOException) {
+                    startActivityForResult(
+                            ((UserRecoverableAuthIOException) mLastError).getIntent(),
+                            MainActivity.REQUEST_AUTHORIZATION);
+                } else {
+                    mOutputText.setText("The following error occurred:\n"
+                            + mLastError.getMessage());
+                }
+            } else {
+                mOutputText.setText("Request cancelled.");
+            }
         }
     }
 }
